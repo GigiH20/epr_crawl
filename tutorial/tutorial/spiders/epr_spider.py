@@ -1,22 +1,26 @@
 import scrapy
 from tutorial.items import EprScrapyItem
 
+
 class EprSpider(scrapy.Spider):
     name = 'epr'
     allowed_domains = ['epr.monre.gov.vn']
     start_urls = [
-        "https://epr.monre.gov.vn/vi/"
+        "https://epr.monre.gov.vn/vi/tin-tuc/"  
     ]
 
     def parse(self, response):
-        data = response.css('article.news-item')
+        # self.logger.info('Processing link %s', response.url)
+        for item_url in response.css('a.is-media-card::attr(href)').extract():
+            yield scrapy.Request(response.urljoin(item_url), callback=self.parse_item)
+    def parse_item(self, response): 
+        # self.logger.info('Processing item %s', response.url)
+        item = EprScrapyItem()
+        item['title'] = response.css("div.epr-section-menu-label__wrapper span::text").getall()
+        description =  response.css("div.row em::text").extract_first()
+        if description: 
+            item['description'] = description
+        else:
+            item['description'] = response.css("div.row p::text").extract_first()
+        yield item
 
-        for element in data:
-            item = EprScrapyItem()
-            item['title'] = element.css('h3 a::text').getall()
-            slug = element.css('h3 a::attr(href)').getall()
-            item['slug'] = ['https://epr.monre.gov.vn/vi/' + s for s in slug]
-            item['description'] = element.css('a.description::text').getall()
-            thumbnails = element.css('div.thumb-art::attr(style)').get()
-            item['thumbnail'] = thumbnails.split('/')[-1]  
-            yield item
